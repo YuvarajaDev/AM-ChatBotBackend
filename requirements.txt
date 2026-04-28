@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+litellm
+boto3
+python-dotenv
+mcp
+anyio
+pydantic
+psycopg2-binary
+PyJWT
+bcrypt
+pycryptodome
