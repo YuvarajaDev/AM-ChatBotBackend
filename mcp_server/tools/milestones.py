@@ -67,6 +67,7 @@ def get_milestones(jwt: str, booking_id: str) -> dict:
             "milestoneData":       next_m.get("milestoneData", {}),
             "isSkip":              next_m.get("isSkip", 0),
             "_id":                 next_m.get("_id", ""),
+            "bookingId":          booking_id,
             # access info
             "isAccess":            is_access,
             "actionRoleNames":     [get_role_name(r) for r in action_roles] if not is_access else [],
@@ -88,6 +89,7 @@ def get_milestones(jwt: str, booking_id: str) -> dict:
             'bookingFlow': data.get("bookingFlow", 0),
             'blTerm': data.get("blTerm", ""),
             'blType': data.get("blType", ""),
+            'bookingObjId': data.get("bookingId", ""),
             "milestones": enriched
         }
         return {"success": True, "data": finalData}
@@ -128,14 +130,15 @@ def update_milestone(jwt: str, booking_id: str, milestone_name: str, collected_d
         milestone = get_milestones(jwt, booking_id)
         if not milestone.get("success"):
             return {"success": False, "message": f"Failed to fetch milestone data: {milestone.get('message', 'Unknown error')}"}
+        milestoneObjBookingId = milestone.get("data", {}).get("bookingObjId", "")
         milestones = milestone.get("data", {}).get("milestones", [])
     except requests.exceptions.RequestException as e:
         return {"success": False, "message": f"Failed to fetch milestone data: {e}"}
 
     milestone = next((m for m in milestones if m.get("milestoneName") == milestone_name), None)
     if not milestone:
-        return {"success": True, "message": f"Milestone '{milestone_name}' has been updated successfully."} # for testing need to remove
-        # return {"success": False, "message": f"Milestone '{milestone_name}' not found for this booking."}
+        # return {"success": True, "message": f"Milestone '{milestone_name}' has been updated successfully."} # for testing need to remove
+        return {"success": False, "message": f"Milestone '{milestone_name}' not found for this booking."}
 
     # 3. Role access check
     action_roles = milestone.get("milestoneActionRole", [])
@@ -195,17 +198,17 @@ def update_milestone(jwt: str, booking_id: str, milestone_name: str, collected_d
 
     # 6. Build update payload — spread milestone object + required fields
     milestone_id   = milestone.get("_id", "")
-    update_payload = {
+    update_payload = {"data": [{
         **milestone,
         "milestoneBy":     user_id,
         "userRole":        user_role,
-        "bookingId":       booking_id,
+        "bookingId":       milestoneObjBookingId,
+        "milestoneStatus": 1,  # mark as completed
         "milestoneStepId": milestone_id,
         "milestoneData":   collected_data,
-        "isDU":            1,
         "fileUpload":      file_uploads,  # [{ fileName, filePath (base64), fileLabel }]
         "isEncryptionRequired": False,
-    }
+    }]}
 
     # 7. Call AM update API
     try:

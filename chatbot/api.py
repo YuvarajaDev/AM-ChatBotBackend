@@ -40,7 +40,10 @@ from chatbot.models import (
 from chatbot.chat_engine import stream_response
 from chatbot import session as sess
 
-from mcp_server.tools.milestones import get_milestones as fetch_milestones
+from mcp_server.tools.milestones import (
+    get_milestones   as fetch_milestones,
+    update_milestone as run_update_milestone,
+)
 from mcp_server.tools.auth import authenticate_user
 
 
@@ -234,20 +237,38 @@ async def search_schedule(request: Request) -> dict:
     except HTTPException as e:
         raise e
 
+@app.post("/milestones/update")
 async def update_milestone(request: Request) -> dict:
-    # 1. Extract JWT, booking ID, milestone name, collected data, and file uploads from request
+    """
+    Direct passthrough to update_milestone — bypasses LLM/MCP for Postman testing.
+
+    Headers: Authorization: Bearer <AM JWT>
+    Body:
+      {
+        "bookingId":      "AM-04-26-0012",
+        "milestoneName":  "containerSealno",
+        "collectedData":  { "containerNo": "ABCD1234567", "sealNo": "S98765" },
+        "fileUploads":    [{ "fileName": "...", "filePath": "<base64>", "fileLabel": "..." }]
+      }
+    """
     try:
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
             raise HTTPException(status_code=401, detail="Missing or invalid Authorization header.")
         jwt = auth_header.split(" ")[1]
-        body = await request.json()
-        booking_id = body['bookingId']
-        milestone_name = body['milestoneName']
-        collected_data = body.get('collectedData', {})
-        file_uploads = body.get('fileUploads', [])
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid request format: {e}") 
+
+        body           = await request.json()
+        booking_id     = body.get("bookingId")
+        milestone_name = body.get("milestoneName")
+        collected_data = body.get("collectedData") or {}
+        file_uploads   = body.get("fileUploads")  or []
+
+        if not booking_id or not milestone_name:
+            raise HTTPException(status_code=400, detail="bookingId and milestoneName are required.")
+
+        return run_update_milestone(jwt, booking_id, milestone_name, collected_data, file_uploads)
+    except HTTPException as e:
+        raise e
 
 # ── Health ────────────────────────────────────────────────────────────────────
 
