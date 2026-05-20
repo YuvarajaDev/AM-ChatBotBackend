@@ -36,9 +36,15 @@ MILESTONE_CONFIG = {
         "proceedMileStone": True,
         "isFloatingMileStone": False,
         "isFileUpload": True,
+        "instruction": (
+            "Ask ONLY this question first: 'Does your shipment have any dimension deviations? (Yes / No)' — "
+            "do not mention any files yet. Wait for the answer. "
+            "If Yes: respond with 'If you have cargo deviations, please proceed with this milestone on AllMasters by filling in the cargo information.' "
+            "Then STOP — do not ask for files, do not call update_milestone. "
+            "If No: proceed to collect the requiredFields (file upload), confirm with the user, then call update_milestone."
+        ),
         "requiredFields": [
-            {"type": "switch", "label": "Has Dimension Deviations?", "name": "amendementSwitch"},
-            {"type": "file",   "label": "Upload File", "name": "surveryCompleted", "isMultiFile": False, "fileLabel": "Survey Completed"},
+            {"type": "file", "label": "Upload File", "name": "surveryCompleted", "isMultiFile": False, "fileLabel": "Survey Completed"},
         ],
     },
     "revisedMeasurment": {
@@ -353,9 +359,9 @@ def should_perform_on_am(milestone_name: str, user_role: int = None) -> bool:
 
 
 def get_text_fields(milestone_name: str, user_role: int = None) -> list:
-    """Return only non-file required fields — these are collected via chat."""
+    """Return text/date/checkbox fields — validated by update_milestone. Excludes file and switch types."""
     cfg = get_milestone_config(milestone_name, user_role)
-    return [f for f in cfg.get("requiredFields", []) if f["type"] != "file"]
+    return [f for f in cfg.get("requiredFields", []) if f["type"] not in ("file", "switch")]
 
 
 def get_file_fields(milestone_name: str, user_role: int = None) -> list:

@@ -18,24 +18,34 @@ load_dotenv()
 AM_API_BASE_URL = os.getenv("AM_API_BASE_URL", "http://localhost:3000")
 
 
+# ── Internal helper ────────────────────────────────────────────────────────────
+
+def _fetch_all_milestones(jwt: str, booking_id: str) -> tuple:
+    """
+    Fetch raw milestone list + booking data from AM API.
+    Returns (milestones_list, data_dict). Not exposed to the LLM.
+    """
+    r = requests.post(
+        f"{AM_API_BASE_URL}/milestone/getRefineMilestoneByAMBookingId",
+        json={"data": [{"bookingId": booking_id, "isEncryptionRequired": False}]},
+        headers=_auth_headers(jwt),
+        timeout=10,
+    )
+    r.raise_for_status()
+    body = r.json()
+    data = json.loads(body.get("data", "{}"))
+    return data.get("milestone", []), data
+
+
 # ── Get Milestones ─────────────────────────────────────────────────────────────
 
 def get_milestones(jwt: str, booking_id: str) -> dict:
     """
     Fetch milestones for a booking from AM API and merge with local config.
-    Returns list of milestones enriched with requiredFields and access info.
+    Returns the first pending milestone enriched with requiredFields and access info.
     """
     try:
-        r = requests.post(
-            f"{AM_API_BASE_URL}/milestone/getRefineMilestoneByAMBookingId",
-            json={"data": [{"bookingId": booking_id, "isEncryptionRequired": False}]},
-            headers=_auth_headers(jwt),
-            timeout=10,
-        )
-        r.raise_for_status()
-        body      = r.json()
-        data      = json.loads(body.get("data", "{}"))   # data is a JSON string
-        milestones = data.get("milestone", [])            # key is "milestone" not "milestones"
+        milestones, data = _fetch_all_milestones(jwt, booking_id)
         if not milestones:
             return {"success": False, "message": "No milestones found for this booking."}
 
@@ -75,8 +85,9 @@ def get_milestones(jwt: str, booking_id: str) -> dict:
             "requiredFields":      cfg.get("requiredFields", []) if is_access else [],
             "isFileUpload":        cfg.get("isFileUpload", False),
             "proceedMileStone":    cfg.get("proceedMileStone", False),
+            "instruction":         cfg.get("instruction", None),
         }]
-            
+
         finalData = {
             "bookingId": booking_id,
             'AMSBy': data.get("AMSBy", ""),
@@ -90,7 +101,7 @@ def get_milestones(jwt: str, booking_id: str) -> dict:
             'blTerm': data.get("blTerm", ""),
             'blType': data.get("blType", ""),
             'bookingObjId': data.get("bookingId", ""),
-            "milestones": enriched
+            "milestones": enriched,
         }
         return {"success": True, "data": finalData}
 
@@ -108,11 +119,12 @@ def update_milestone(jwt: str, booking_id: str, milestone_name: str, collected_d
 
     Flow:
       1. Decode JWT → userId, userRole
-      2. Fetch milestone from AM API
+      2. Fetch all milestones from AM API (single call via helper)
       3. Check milestoneActionRole vs userRole
-      4. If portal-only (file-only fields) → redirect message
+      4. If portal-only → redirect message
       5. Validate collected text/date fields
-      6. POST update to AM API
+      6. Build payload (+ revisedMeasurment skip for surveyCompleted)
+      7. POST update to AM API
     """
     collected_data = collected_data or {}
     file_uploads   = file_uploads   or []
@@ -125,19 +137,16 @@ def update_milestone(jwt: str, booking_id: str, milestone_name: str, collected_d
     if not user_role or not user_id:
         return {"success": False, "message": "Invalid session. Please authenticate again."}
 
-    # 2. Fetch milestones to find this one
+    # 2. Fetch all milestones (single API call — raw list used for target + companion updates)
     try:
-        milestone = get_milestones(jwt, booking_id)
-        if not milestone.get("success"):
-            return {"success": False, "message": f"Failed to fetch milestone data: {milestone.get('message', 'Unknown error')}"}
-        milestoneObjBookingId = milestone.get("data", {}).get("bookingObjId", "")
-        milestones = milestone.get("data", {}).get("milestones", [])
+        all_milestones, data = _fetch_all_milestones(jwt, booking_id)
     except requests.exceptions.RequestException as e:
         return {"success": False, "message": f"Failed to fetch milestone data: {e}"}
 
-    milestone = next((m for m in milestones if m.get("milestoneName") == milestone_name), None)
+    milestoneObjBookingId = data.get("bookingId", "")
+
+    milestone = next((m for m in all_milestones if m.get("milestoneName") == milestone_name), None)
     if not milestone:
-        # return {"success": True, "message": f"Milestone '{milestone_name}' has been updated successfully."} # for testing need to remove
         return {"success": False, "message": f"Milestone '{milestone_name}' not found for this booking."}
 
     # 3. Role access check
@@ -156,7 +165,7 @@ def update_milestone(jwt: str, booking_id: str, milestone_name: str, collected_d
     # 4. Check if this milestone must be performed on AllMasters portal
     if should_perform_on_am(milestone_name, user_role):
         return {
-            "success":        False,
+            "success": False,
             "portal_required": True,
             "message": (
                 f"The '{milestone.get('milestoneLabelName', milestone_name)}' milestone needs to be completed "
@@ -176,7 +185,7 @@ def update_milestone(jwt: str, booking_id: str, milestone_name: str, collected_d
         }
 
     # 5b. Validate file fields — must be provided by user via chat upload
-    file_fields  = get_file_fields(milestone_name, user_role)
+    file_fields = get_file_fields(milestone_name, user_role)
 
     # Frontend sets fileLabel from the upload filename, which won't match the
     # required field name. Rewrite each upload's fileLabel to the required
@@ -209,6 +218,23 @@ def update_milestone(jwt: str, booking_id: str, milestone_name: str, collected_d
         "fileUpload":      file_uploads,  # [{ fileName, filePath (base64), fileLabel }]
         "isEncryptionRequired": False,
     }]}
+
+    # surveyCompleted: always skip revisedMeasurment in the same API call
+    if milestone_name == "surveyCompleted":
+        revised = next((m for m in all_milestones if m.get("milestoneName") == "revisedMeasurment"), None)
+        if revised:
+            update_payload["data"].append({
+                **revised,
+                "milestoneBy":     user_id,
+                "userRole":        user_role,
+                "bookingId":       milestoneObjBookingId,
+                "milestoneStatus": 2,
+                "milestoneStepId": revised.get("_id", ""),
+                "isSkip":          1,
+                "milestoneData":   {},
+                "fileUpload":      [],
+                "isEncryptionRequired": False,
+            })
 
     # 7. Call AM update API
     try:
