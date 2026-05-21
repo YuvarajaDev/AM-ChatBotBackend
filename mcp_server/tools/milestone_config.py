@@ -37,7 +37,8 @@ MILESTONE_CONFIG = {
         "isFloatingMileStone": False,
         "isFileUpload": True,
         "instruction": (
-            "Ask ONLY this question first: 'Does your shipment have any dimension deviations? (Yes / No)' — "
+            "Tell the user: 'The next milestone is Survey Completed.' "
+            "Then ask ONLY: 'Before we proceed, does your shipment have any dimension deviations? (Yes / No)' — "
             "do not mention any files yet. Wait for the answer. "
             "If Yes: respond with 'If you have cargo deviations, please proceed with this milestone on AllMasters by filling in the cargo information.' "
             "Then STOP — do not ask for files, do not call update_milestone. "
@@ -78,6 +79,7 @@ MILESTONE_CONFIG = {
     "containerSealno": {
         "proceedMileStone": False,
         "isFloatingMileStone": False,
+        "shouldPerformAM": False,
         "isFileUpload": False,
         "requiredFields": [
             {"type": "text", "label": "Container Number", "name": "containerNo"},

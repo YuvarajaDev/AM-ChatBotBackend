@@ -8,6 +8,7 @@ Handles role-based access check before any update.
 import os
 import json
 import requests
+from dateutil import parser as dateutil_parser
 from dotenv import load_dotenv
 
 from .utils import decode_am_jwt, get_role_name, _auth_headers
@@ -18,7 +19,46 @@ load_dotenv()
 AM_API_BASE_URL = os.getenv("AM_API_BASE_URL", "http://localhost:3000")
 
 
-# ── Internal helper ────────────────────────────────────────────────────────────
+# ── Helpers ────────────────────────────────────────────────────────────────────
+
+_DAYS   = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+def _format_date_ist(value: str) -> str:
+    """Parse any date string and return JS Date.toString() style in IST (+0530)."""
+    try:
+        dt = dateutil_parser.parse(value.strip())
+        return (
+            f"{_DAYS[dt.weekday()]} {_MONTHS[dt.month - 1]} "
+            f"{dt.day} {dt.year} 00:00:00 GMT+0530"
+        )
+    except Exception:
+        return value  # return as-is if parsing fails
+
+
+def _build_milestone_data(collected_data: dict, milestone_name: str, user_role: int) -> dict:
+    """
+    Transform flat collected_data into AM API format:
+      text/date/dateAndTime fields → { label, value }  (date values reformatted to IST)
+      checkbox/switch/file         → passed through as-is
+    """
+    cfg = get_milestone_config(milestone_name, user_role)
+    field_map = {f["name"]: f for f in cfg.get("requiredFields", [])}
+    SKIP_TYPES = {"checkbox", "switch", "file"}
+
+    result = {}
+    for key, raw_value in collected_data.items():
+        field = field_map.get(key)
+        if field is None or field.get("type") in SKIP_TYPES:
+            result[key] = raw_value
+            continue
+        label      = field.get("label", key)
+        field_type = field.get("type", "text")
+        value      = _format_date_ist(str(raw_value)) if field_type in ("date", "dateAndTime") else raw_value
+        result[key] = {"label": label, "value": value}
+
+    return result
+
 
 def _fetch_all_milestones(jwt: str, booking_id: str) -> tuple:
     """
@@ -85,6 +125,7 @@ def get_milestones(jwt: str, booking_id: str) -> dict:
             "requiredFields":      cfg.get("requiredFields", []) if is_access else [],
             "isFileUpload":        cfg.get("isFileUpload", False),
             "proceedMileStone":    cfg.get("proceedMileStone", False),
+            "shouldPerformAM":     cfg.get("shouldPerformAM", False),
             "instruction":         cfg.get("instruction", None),
         }]
 
@@ -214,7 +255,7 @@ def update_milestone(jwt: str, booking_id: str, milestone_name: str, collected_d
         "bookingId":       milestoneObjBookingId,
         "milestoneStatus": 1,  # mark as completed
         "milestoneStepId": milestone_id,
-        "milestoneData":   collected_data,
+        "milestoneData":   _build_milestone_data(collected_data, milestone_name, user_role),
         "fileUpload":      file_uploads,  # [{ fileName, filePath (base64), fileLabel }]
         "isEncryptionRequired": False,
     }]}
