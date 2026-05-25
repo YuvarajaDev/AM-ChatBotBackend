@@ -86,9 +86,10 @@ MILESTONE_CONFIG = {
             {"type": "text", "label": "Seal Number",      "name": "sealNo"},
         ],
     },
-    "shippingInstruction": {
+    "shippingInstruction": { # AI exstraction needed, hence need to perform threw AM portal
         "proceedMileStone": True,
         "isFloatingMileStone": True,
+        "shouldPerformAM": True,
         "isFileUpload": True,
         "requiredFields": [
             {"type": "file", "label": "Upload File", "name": "shippingInstruction", "isMultiFile": False, "fileLabel": "Shipping Instruction"},
@@ -133,6 +134,7 @@ MILESTONE_CONFIG = {
     "hblDraft": {
         "proceedMileStone": False,
         "isFloatingMileStone": False,
+        "shouldPerformAM": True, # This is a special case — only proceed with this milestone via AM portal bcs it have doc genration, which is complex to handle in chat. So we set shouldPerformAM to True and tell user to proceed via AM portal.
         "isFileUpload": True,
         "requiredFields": [
             {"type": "file", "label": "Upload File", "name": "hblDraft", "isMultiFile": False, "fileLabel": "HBL Draft"},
@@ -149,6 +151,7 @@ MILESTONE_CONFIG = {
     "hblFinal": {
         "proceedMileStone": False,
         "isFloatingMileStone": True,
+        "shouldPerformAM": True, # This is a special case — only proceed with this milestone via AM portal bcs it have doc genration, which is complex to handle in chat. So we set shouldPerformAM to True and tell user to proceed via AM portal.
         "isFileUpload": True,
         "requiredFields": [
             {"type": "text", "label": "HBL Number", "name": "hblNumber", "placeHolder": "Enter HBL Number"},
@@ -172,6 +175,7 @@ MILESTONE_CONFIG = {
     "stuffingReport": {
         "proceedMileStone": False,
         "isFloatingMileStone": False,
+        "shouldPerformAM": True, # This is a special case — only proceed with this milestone via AM portal bcs it have doc genration, which is complex to handle in chat. So we set shouldPerformAM to True and tell user to proceed via AM portal.
         "isFileUpload": True,
         "requiredFields": [
             {"type": "file", "label": "Upload File", "name": "stuffingReport", "isMultiFile": False, "fileLabel": "Stuffing Report"},
@@ -180,15 +184,17 @@ MILESTONE_CONFIG = {
     "digitalCargoReceiptDraft": {
         "proceedMileStone": False,
         "isFloatingMileStone": False,
+        "shouldPerformAM": True, # This is a special case — only proceed with this milestone via AM portal bcs it have doc genration, which is complex to handle in chat. So we set shouldPerformAM to True and tell user to proceed via AM portal.
         "isFileUpload": True,
         "requiredFields": [
             {"type": "text", "label": "Sea Waybill Number", "name": "seaWayBillNo", "placeHolder": "Enter Sea Waybill Number"},
-            {"type": "file", "label": "Upload File",         "name": "digitalCargoReceiptDraft", "isMultiFile": False, "fileLabel": "Digital Cargo Receipt Draft"},
+            {"type": "file", "label": "Upload File", "name": "digitalCargoReceiptDraft", "isMultiFile": False, "fileLabel": "Digital Cargo Receipt Draft"},
         ],
     },
     "invoiceRelease": {
         "proceedMileStone": False,
         "isFloatingMileStone": False,
+        "shouldPerformAM": True, # This is a special case — only proceed with this milestone via AM portal bcs it is handled by seprate logic, which is complex to handle in chat. So we set shouldPerformAM to True and tell user to proceed via AM portal.
         "isFileUpload": True,
         "requiredFields": [],
     },
@@ -212,6 +218,7 @@ MILESTONE_CONFIG = {
     "digitalCargoReceiptVerification": {
         "proceedMileStone": True,
         "isFloatingMileStone": False,
+        "shouldPerformAM": True, # This is a special case — only proceed with this milestone via AM portal bcs it have doc genration, which is complex to handle in chat. So we set shouldPerformAM to True and tell user to proceed via AM portal.
         "isFileUpload": True,
         "requiredFields": [
             {"type": "file",     "label": "Upload File",       "name": "digitalCargoReceiptVerification", "isMultiFile": False, "fileLabel": "Digital Cargo Receipt Verification"},
@@ -230,6 +237,7 @@ MILESTONE_CONFIG = {
     "digitalCargoReceiptFinal": {
         "proceedMileStone": False,
         "isFloatingMileStone": True,
+        "shouldPerformAM": True, # This is a special case — only proceed with this milestone via AM portal bcs it have doc genration, which is complex to handle in chat. So we set shouldPerformAM to True and tell user to proceed via AM portal.
         "isFileUpload": True,
         "requiredFields": [
             {"type": "file", "label": "Upload File", "name": "digitalCargoReceiptFinal", "isMultiFile": False, "fileLabel": "Digital Cargo Receipt Final"},
