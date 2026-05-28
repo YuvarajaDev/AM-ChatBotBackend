@@ -93,17 +93,19 @@ def get_milestones(jwt: str, booking_id: str) -> dict:
         user_info = decode_am_jwt(jwt)
         user_role = user_info.get("role")
 
-        # Find the first pending (status == 0) milestone
-        next_m = next((m for m in milestones if m.get("milestoneStatus", 0) == 0), None)
+        # Find the first actionable milestone: pending (0) or on-hold (4)
+        next_m = next((m for m in milestones if m.get("milestoneStatus") in (0, 4)), None)
         if not next_m:
             return {"success": True, "data": {
                 "bookingId": booking_id, "milestones": [],
                 "message": "All milestones completed for this booking."
             }}
 
-        name         = next_m.get("milestoneName", "")
-        action_roles = next_m.get("milestoneActionRole", [])
-        cfg          = get_milestone_config(name, user_role)
+        name             = next_m.get("milestoneName", "")
+        milestone_status = next_m.get("milestoneStatus", 0)
+        is_on_hold       = (milestone_status == 4)
+        action_roles     = next_m.get("milestoneActionRole", [])
+        cfg              = get_milestone_config(name, user_role)
 
         # Empty action_roles means any role can update
         is_access = (not action_roles) or (user_role in action_roles)
@@ -111,17 +113,19 @@ def get_milestones(jwt: str, booking_id: str) -> dict:
         enriched = [{
             "milestoneName":       name,
             "milestoneLabelName":  next_m.get("milestoneLabelName", ""),
-            "milestoneStatus":     next_m.get("milestoneStatus", 0),
+            "milestoneStatus":     milestone_status,
             "milestoneActionRole": action_roles,
             "milestoneViewRole":   next_m.get("milestoneViewRole", []),
             "milestoneData":       next_m.get("milestoneData", {}),
             "isSkip":              next_m.get("isSkip", 0),
             "_id":                 next_m.get("_id", ""),
-            "bookingId":          booking_id,
+            "bookingId":           booking_id,
+            # on-hold flag — LLM must inform user and stop; no fields to collect
+            "isOnHold":            is_on_hold,
             # access info
             "isAccess":            is_access,
             "actionRoleNames":     [get_role_name(r) for r in action_roles] if not is_access else [],
-            # config — only expose required fields when user has access
+            # config — expose required fields when user has access (on-hold still needs them)
             "requiredFields":      cfg.get("requiredFields", []) if is_access else [],
             "isFileUpload":        cfg.get("isFileUpload", False),
             "proceedMileStone":    cfg.get("proceedMileStone", False),
@@ -198,7 +202,9 @@ def update_milestone(jwt: str, booking_id: str, milestone_name: str, collected_d
     if not milestone:
         return {"success": False, "message": f"Milestone '{milestone_name}' not found for this booking."}
 
-    # 3. Role access check
+    is_on_hold = milestone.get("milestoneStatus") == 4
+
+    # 3. Role access check (applies for both normal and on-hold milestones)
     action_roles = milestone.get("milestoneActionRole", [])
     if action_roles and user_role not in action_roles:
         role_names = [get_role_name(r) for r in action_roles]
@@ -212,7 +218,8 @@ def update_milestone(jwt: str, booking_id: str, milestone_name: str, collected_d
         }
 
     # 4. Check if this milestone must be performed on AllMasters portal
-    if should_perform_on_am(milestone_name, user_role):
+    # Skip this check for on-hold milestones — user is unhol ding, not starting fresh.
+    if not is_on_hold and should_perform_on_am(milestone_name, user_role):
         return {
             "success": False,
             "portal_required": True,
@@ -254,17 +261,17 @@ def update_milestone(jwt: str, booking_id: str, milestone_name: str, collected_d
             "message":        f"Please upload the required file(s): {', '.join(missing_labels)}",
         }
 
-    # 6. Build update payload — spread milestone object + required fields
+    # 6. Build update payload
     milestone_id   = milestone.get("_id", "")
     update_payload = {"data": [{
         **milestone,
         "milestoneBy":     user_id,
         "userRole":        user_role,
         "bookingId":       milestoneObjBookingId,
-        "milestoneStatus": 1,  # mark as completed
+        "milestoneStatus": 1,
         "milestoneStepId": milestone_id,
         "milestoneData":   _build_milestone_data(collected_data, milestone_name, user_role),
-        "fileUpload":      file_uploads,  # [{ fileName, filePath (base64), fileLabel }]
+        "fileUpload":      file_uploads,
         "isEncryptionRequired": False,
     }]}
 
