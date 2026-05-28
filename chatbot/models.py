@@ -43,10 +43,11 @@ class ChatRequest(BaseModel):
 
 
 class AMAuthRequest(BaseModel):
-    chat_id:   str
-    email:     str
-    password:  str
-    user_type: Optional[int] = None   # 1=Administrator, 2=Partner, 3=Customer
+    chat_id:     str
+    email:       str
+    password:    str
+    user_type:   Optional[int] = None   # 1=Administrator, 2=Partner, 3=Customer
+    switch_mode: bool = False           # True when triggered by Switch Account button
 
 
 class NewChatResponse(BaseModel):

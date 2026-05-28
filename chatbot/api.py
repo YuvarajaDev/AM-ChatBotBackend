@@ -175,9 +175,9 @@ async def am_auth(
     sess.save_jwt(current_user["user_id"], request.chat_id, result)
 
     # Strip the poisoned failed-auth turn from history so the upcoming retry
-    # starts from clean state. The frontend will auto-resend the original
-    # user message right after this returns.
-    db.delete_trailing_turn(request.chat_id)
+    # starts from clean state. Skip this for switch_mode — no poisoned turn exists.
+    if not request.switch_mode:
+        db.delete_trailing_turn(request.chat_id)
 
     return {"success": True, "message": "AllMasters authentication successful."}
 
