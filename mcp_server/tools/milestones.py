@@ -146,6 +146,10 @@ def get_milestones(jwt: str, booking_id: str) -> dict:
         }
         return {"success": True, "data": finalData}
 
+    except requests.exceptions.HTTPError as e:
+        if e.response is not None and e.response.status_code == 401:
+            return {"error": "not_authenticated", "message": "Session expired. Please authenticate again."}
+        return {"success": False, "message": f"Failed to fetch milestones: {e}"}
     except requests.exceptions.RequestException as e:
         return {"success": False, "message": f"Failed to fetch milestones: {e}"}
     except Exception as e:
@@ -181,6 +185,10 @@ def update_milestone(jwt: str, booking_id: str, milestone_name: str, collected_d
     # 2. Fetch all milestones (single API call — raw list used for target + companion updates)
     try:
         all_milestones, data = _fetch_all_milestones(jwt, booking_id)
+    except requests.exceptions.HTTPError as e:
+        if e.response is not None and e.response.status_code == 401:
+            return {"error": "not_authenticated", "message": "Session expired. Please authenticate again."}
+        return {"success": False, "message": f"Failed to fetch milestone data: {e}"}
     except requests.exceptions.RequestException as e:
         return {"success": False, "message": f"Failed to fetch milestone data: {e}"}
 

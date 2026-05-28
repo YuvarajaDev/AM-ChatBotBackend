@@ -96,12 +96,13 @@ def proceed_logout(id: str, type: int, jwt: str) -> dict:
     )
     r.raise_for_status()
     return r.json()
-def authenticate_user(username: str, password: str) -> dict:
+def authenticate_user(username: str, password: str, user_type: int = None) -> dict:
     try:
         encrypted_password = _encrypt(password)
 
-        # Fetch user type dynamically before login
-        user_type = get_user_type(username, encrypted_password)
+        # Use provided user_type; fall back to API lookup if not given
+        if user_type is None:
+            user_type = get_user_type(username, encrypted_password)
         # print(f"  [Auth] User type for {username}: {user_type}", file=sys.stderr)
 
         # AM returns data as a JSON string — parse the inner object

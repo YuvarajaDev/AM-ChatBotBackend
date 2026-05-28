@@ -235,6 +235,12 @@ async def stream_response(
                                 sess.save_jwt(user_id, chat_id, result_dict)
                                 am_jwt = result_dict.get("jwt")
 
+                            # Expired JWT — clear stale session and trigger re-auth popup.
+                            if tool_name in AUTH_REQUIRED_TOOLS and result_dict.get("error") == "not_authenticated":
+                                sess.clear_jwt(user_id, chat_id)
+                                am_jwt = None
+                                auth_pending = True
+
                             yield f"data: {json.dumps({'type': 'tool_result', 'tool': tool_name, 'result': result_dict})}\n\n"
 
                             history.append({

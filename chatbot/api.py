@@ -168,7 +168,7 @@ async def am_auth(
     if owner != current_user["user_id"]:
         raise HTTPException(status_code=403, detail="Access denied.")
 
-    result = authenticate_user(request.email, request.password)
+    result = authenticate_user(request.email, request.password, request.user_type)
     if not result.get("success"):
         return {"success": False, "message": result.get("message", "Authentication failed.")}
 

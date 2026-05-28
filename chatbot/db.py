@@ -401,3 +401,17 @@ def get_am_jwt(user_id: str, chat_id: str) -> str | None:
     finally:
         _put_conn(conn)
     return row[0] if row else None
+
+
+def clear_am_jwt(user_id: str, chat_id: str):
+    """Remove expired/invalid AM JWT so the next request triggers re-authentication."""
+    conn = _get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM sessions WHERE user_id = %s AND chat_id = %s",
+                (user_id, chat_id)
+            )
+        conn.commit()
+    finally:
+        _put_conn(conn)

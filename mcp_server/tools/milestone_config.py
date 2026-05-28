@@ -229,6 +229,7 @@ MILESTONE_CONFIG = {
         "proceedMileStone": False,
         "isFloatingMileStone": False,
         "isFileUpload": False,
+        "shouldPerformAM": True, # This is a special case — only proceed with this milestone via AM portal bcs it is container management and have doc genration, which is complex to handle in chat. So we set shouldPerformAM to True and tell user to proceed via AM portal.
         "requiredFields": [
             {"type": "date", "label": "ATD",       "name": "atd"},
             {"type": "text", "label": "Port Name", "name": "portName"},

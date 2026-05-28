@@ -5,7 +5,7 @@ Thin wrapper around db.save_am_jwt / db.get_am_jwt.
 AllMasters JWT is now keyed by user_id + chat_id.
 """
 
-from chatbot.db import save_am_jwt, get_am_jwt
+from chatbot.db import save_am_jwt, get_am_jwt, clear_am_jwt
 
 
 def save_jwt(user_id: str, chat_id: str, auth_response: dict):
@@ -16,3 +16,8 @@ def save_jwt(user_id: str, chat_id: str, auth_response: dict):
 def get_jwt(user_id: str, chat_id: str) -> str | None:
     """Retrieve AM JWT for this user+chat. Returns None if not authenticated with AM."""
     return get_am_jwt(user_id, chat_id)
+
+
+def clear_jwt(user_id: str, chat_id: str):
+    """Remove expired/invalid AM JWT so the next request triggers re-authentication."""
+    clear_am_jwt(user_id, chat_id)
